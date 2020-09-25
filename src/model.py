@@ -170,6 +170,16 @@ class UNet_Based(nn.Module):
             out_channels=in_channels*2,
             kernel_size=1
         )
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+                nn.init.kaiming_normal_(
+                    m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
     def forward(self, combined_image):
         # encoder
@@ -273,11 +283,20 @@ class MobileUnet(nn.Module):
             out_channels=in_channels*2,
             kernel_size=1
         )
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+                nn.init.kaiming_normal_(
+                    m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
     def forward(self, combined_image):
         # encoder
         # bs, c, h, w
-
         x = self.conv1(combined_image)
         x1 = self.sconv1(x)
         x = self.conv2(x1)
