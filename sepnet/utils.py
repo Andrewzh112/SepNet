@@ -43,4 +43,16 @@ def mix_images(images):
         mix_image = r0 * image0 + r1 * image1
         mixed_images.append(mix_image)
     image_pairs = torch.stack(image_pairs, dim=0)
+    mixed_images = torch.stack(mixed_images, dim=0)
     return image_pairs, mixed_images, ratios
+
+
+def unstack_images(constructed_images):
+    images = []
+    for ci in constructed_images:
+        image0 = ci[:3, :, :]
+        image1 = ci[3:, :, :]
+        images.append(image0)
+        images.append(image1)
+    images = torch.stack(images, dim=0)
+    return images

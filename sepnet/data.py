@@ -3,6 +3,7 @@ from glob import glob
 from PIL import Image
 from torchvision import transforms
 from random import shuffle
+from sepnet.utils import filter_images
 import numpy as np
 import os
 import warnings
@@ -11,8 +12,10 @@ warnings.filterwarnings("ignore")
 
 
 class SepDataset(Dataset):
-    def __init__(self, statistics=None, transform=None, img_path='images'):
+    def __init__(self, statistics=None, transform=None, img_path='images', filter_imgs=False):
         super().__init__()
+        if filter_imgs:
+            filter_images(image_path=img_path)
         self.images = glob(os.path.join(img_path, '*'))
         shuffle(self.images)
         # M = [0.48572235511288586, 0.4533838840736244, 0.41519041094505277]
@@ -22,7 +25,8 @@ class SepDataset(Dataset):
             print('New dataset means M=', M)
             print('New dataset stds S=', S)
         else:
-            assert isinstance(tuple, statistics) and len(statistics) == 2
+            assert isinstance(statistics, (tuple, list)
+                              ) and len(statistics) == 2
             M, S = statistics
         if transform is None:
             self.transform = transforms.Compose(
@@ -30,8 +34,8 @@ class SepDataset(Dataset):
                     transforms.RandomHorizontalFlip(),
                     transforms.RandomCrop((224, 224)),
                     transforms.ColorJitter(),
-                    transforms.Normalize(M, S),
-                    transforms.ToTensor()
+                    transforms.ToTensor(),
+                    transforms.Normalize(M, S)
                 ]
             )
 
