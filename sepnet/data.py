@@ -2,6 +2,7 @@ from torch.utils.data import Dataset, DataLoader
 from glob import glob
 from PIL import Image
 from torchvision import transforms
+from random import shuffle
 import numpy as np
 import os
 import warnings
@@ -13,6 +14,7 @@ class SepDataset(Dataset):
     def __init__(self, statistics=None, transform=None, img_path='images'):
         super().__init__()
         self.images = glob(os.path.join(img_path, '*'))
+        shuffle(self.images)
         # M = [0.48572235511288586, 0.4533838840736244, 0.41519041094505277]
         # S = [0.2619148023576319, 0.2551473237582999, 0.2580172359016024]
         if statistics is None:
@@ -70,7 +72,8 @@ class SepDataset(Dataset):
             G += np.sum((image[:, :, 1] - G_mean) ** 2)
             B += np.sum((image[:, :, 2] - B_mean) ** 2)
 
-        R_std, G_std, B_std = np.sqrt(R / pixels), np.sqrt(G / pixels), np.sqrt(B / pixels)
+        R_std, G_std, B_std = np.sqrt(
+            R / pixels), np.sqrt(G / pixels), np.sqrt(B / pixels)
         return [R_std, G_std, B_std]
 
     def __len__(self):
