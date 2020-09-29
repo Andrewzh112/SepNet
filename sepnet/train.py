@@ -5,16 +5,6 @@ from sepnet.utils import mix_images, unstack_images
 from sepnet.loss import SeperationLoss
 from tqdm import tqdm
 import os
-import logging
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-formatter = logging.Formatter(
-    "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-ch.setFormatter(formatter)
-logger.addHandler(ch)
 
 
 class Trainer:
@@ -70,17 +60,7 @@ class Trainer:
                     return losses, constructed_images
                 return losses
 
-            model.train()
-            train_epoch_loss = run_epoch(is_train=True, loader=trn_loader)
-            mean_train_epoch_loss = sum(
-                train_epoch_loss) / len(train_epoch_loss)
-            logger.info(
-                f'Epoch {epoch + 1}/{config.epochs}, \
-                    The train loss: {mean_train_epoch_loss:.3f}'
-            )
-
-            model.eval()
-            if (epoch) % 10 == 0:
+            def save_progress():
                 test_epoch_loss, constructed_images = run_epoch(
                     is_train=False,
                     loader=tst_loader,
@@ -100,10 +80,21 @@ class Trainer:
                     model.state_dict(),
                     os.path.join(config.model_path, f'SepNet_Epoch{epoch}.pt')
                 )
+                return test_epoch_loss
+
+            model.train()
+            train_epoch_loss = run_epoch(is_train=True, loader=trn_loader)
+            mean_train_epoch_loss = sum(
+                train_epoch_loss) / len(train_epoch_loss)
+
+            model.eval()
+            if (epoch + 1) % 10 == 0:
+                test_epoch_loss = save_progress()
             else:
                 test_epoch_loss = run_epoch(is_train=False, loader=tst_loader)
             mean_test_epoch_loss = sum(test_epoch_loss) / len(test_epoch_loss)
-            logger.info(
+            tqdm.write(
                 f'Epoch {epoch + 1}/{config.epochs}, \
-                    The test loss: {mean_test_epoch_loss:.3f}'
+                    The train loss: {mean_train_epoch_loss:.3f}, \
+                        The test loss: {mean_test_epoch_loss:.3f}'
             )
