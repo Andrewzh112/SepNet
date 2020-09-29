@@ -5,6 +5,7 @@ import random
 import numpy as np
 import torch
 import logging
+from torchvision import transforms
 
 
 def seed_everything(seed):
@@ -67,11 +68,18 @@ def mix_images(images):
     return image_pairs, mixed_images, ratios
 
 
-def unstack_images(constructed_images):
+def unstack_images(constructed_images, statistics):
+    M, S = statistics
+    unnormalize = transforms.Compose(
+        [
+            transforms.Normalize(mean=[0., 0., 0.], std=[1/s for s in S]),
+            transforms.Normalize(mean=[-m for m in M], std=[1., 1., 1.])
+        ]
+    )
     images = []
     for ci in constructed_images:
-        image0 = ci[:3, :, :]
-        image1 = ci[3:, :, :]
+        image0 = unnormalize(ci[:3, :, :])
+        image1 = unnormalize(ci[3:, :, :])
         images.append(image0)
         images.append(image1)
     images = torch.stack(images, dim=0)

@@ -17,7 +17,7 @@ class Trainer:
             'cuda' if torch.cuda.is_available() else 'cpu'
         )
 
-    def train(self):
+    def train(self, progress_interval=100):
         config, device = self.config, self.device
         model = self.model.to(device)
         criterion = SeperationLoss(loss=torch.nn.SmoothL1Loss())
@@ -62,7 +62,10 @@ class Trainer:
 
             @torch.no_grad()
             def save_progress(constructed_images):
-                images = unstack_images(constructed_images)
+                images = unstack_images(
+                    constructed_images,
+                    self.trn_dataset.statistics
+                )
                 image_out_dir = 'img_outputs'
                 if not os.path.exists(image_out_dir):
                     os.mkdir(image_out_dir)
@@ -89,7 +92,7 @@ class Trainer:
                 train_epoch_loss) / len(train_epoch_loss)
 
             model.eval()
-            if (epoch + 1) % 100 == 0:
+            if (epoch + 1) % progress_interval == 0:
                 with torch.no_grad():
                     test_epoch_loss, constructed_images = run_epoch(
                         is_train=False,

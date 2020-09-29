@@ -22,18 +22,18 @@ class SepDataset(Dataset):
         # S = [0.2619148023576319, 0.2551473237582999, 0.2580172359016024]
         if statistics is None:
             M, S = self.dataset_stats()
-            print('New dataset means M=', M)
-            print('New dataset stds S=', S)
+            print('New dataset means M =', M)
+            print('New dataset stds S =', S)
         else:
             assert isinstance(statistics, (tuple, list)
                               ) and len(statistics) == 2
             M, S = statistics
+        self.statistics = (M, S)
         if transform is None:
             self.transform = transforms.Compose(
                 [
                     transforms.RandomHorizontalFlip(),
                     transforms.RandomCrop((224, 224)),
-                    transforms.ColorJitter(),
                     transforms.ToTensor(),
                     transforms.Normalize(M, S)
                 ]
