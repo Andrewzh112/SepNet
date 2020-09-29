@@ -72,13 +72,15 @@ class Trainer:
                     os.mkdir(image_out_dir)
                 torchvision.utils.save_image(
                     images,
-                    fp=os.path.join(image_out_dir, f'output_epoch{epoch}.jpg')
+                    fp=os.path.join(
+                        image_out_dir, f'output_epoch{epoch + 1}.jpg')
                 )
                 if not os.path.exists(config.model_path):
                     os.mkdir(config.model_path)
                 torch.save(
                     model.state_dict(),
-                    os.path.join(config.model_path, f'SepNet_Epoch{epoch}.pt')
+                    os.path.join(config.model_path,
+                                    f'SepNet_Epoch{epoch + 1}.pt')
                 )
                 return test_epoch_loss
 
@@ -88,13 +90,13 @@ class Trainer:
                 train_epoch_loss) / len(train_epoch_loss)
 
             model.eval()
-            if (epoch + 1) % 10 == 0:
+            if (epoch + 1) % 100 == 0:
                 test_epoch_loss = save_progress()
             else:
                 test_epoch_loss = run_epoch(is_train=False, loader=tst_loader)
             mean_test_epoch_loss = sum(test_epoch_loss) / len(test_epoch_loss)
             tqdm.write(
                 f'Epoch {epoch + 1}/{config.epochs}, \
-                    The train loss: {mean_train_epoch_loss:.3f}, \
-                        The test loss: {mean_test_epoch_loss:.3f}'
+                    Train loss: {mean_train_epoch_loss:.3f}, \
+                        Test loss: {mean_test_epoch_loss:.3f}'
             )
