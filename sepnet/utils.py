@@ -1,9 +1,16 @@
 from glob import glob
 import os
 from PIL import Image
-from random import shuffle
+import random
 import numpy as np
 import torch
+
+
+def seed_everything(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
 
 def filter_images(min_dim=224, image_path='images'):
@@ -16,7 +23,7 @@ def filter_images(min_dim=224, image_path='images'):
 def pair_indices(batch_size):
     assert (batch_size % 2) == 0
     indices = list(range(batch_size))
-    shuffle(indices)
+    random.shuffle(indices)
     for i in range(batch_size // 2):
         yield indices[i*2], indices[i*2 + 1]
 

@@ -76,31 +76,34 @@ class Trainer:
                 train_epoch_loss) / len(train_epoch_loss)
             logger.info(
                 f'Epoch {epoch + 1}/{config.epochs}, \
-                    The training loss is {mean_train_epoch_loss:.3f}'
+                    The train loss: {mean_train_epoch_loss:.3f}'
             )
 
             model.eval()
-            if (epoch + 1) % 10 == 0:
+            if (epoch) % 10 == 0:
                 test_epoch_loss, constructed_images = run_epoch(
                     is_train=False,
                     loader=tst_loader,
                     return_samples=True
                 )
                 images = unstack_images(constructed_images)
-                image_out_dir = 'logs/img_outputs/'
+                image_out_dir = 'img_outputs'
                 if not os.path.exists(image_out_dir):
                     os.mkdir(image_out_dir)
                 torchvision.utils.save_image(
                     images,
-                    fp=image_out_dir+f'output_epoch{epoch}.jpg'
+                    fp=os.path.join(image_out_dir, f'output_epoch{epoch}.jpg')
                 )
                 if not os.path.exists(config.model_path):
                     os.mkdir(config.model_path)
-                torch.save(model.state_dict(), config.model_path+f'SepNet_Epoch{epoch}.pt')
+                torch.save(
+                    model.state_dict(),
+                    os.path.join(config.model_path, f'SepNet_Epoch{epoch}.pt')
+                )
             else:
                 test_epoch_loss = run_epoch(is_train=False, loader=tst_loader)
             mean_test_epoch_loss = sum(test_epoch_loss) / len(test_epoch_loss)
             logger.info(
                 f'Epoch {epoch + 1}/{config.epochs}, \
-                    The training loss is {mean_test_epoch_loss:.3f}'
+                    The test loss: {mean_test_epoch_loss:.3f}'
             )
