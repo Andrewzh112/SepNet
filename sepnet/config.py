@@ -1,5 +1,5 @@
 class Config:
-    epochs = 100
+    epochs = 1000
     batch_size = 8
     opimizer_params = {
         'lr': 3e-4,

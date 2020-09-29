@@ -60,12 +60,8 @@ class Trainer:
                     return losses, constructed_images
                 return losses
 
-            def save_progress():
-                test_epoch_loss, constructed_images = run_epoch(
-                    is_train=False,
-                    loader=tst_loader,
-                    return_samples=True
-                )
+            @torch.no_grad()
+            def save_progress(constructed_images):
                 images = unstack_images(constructed_images)
                 image_out_dir = 'img_outputs'
                 if not os.path.exists(image_out_dir):
@@ -73,16 +69,19 @@ class Trainer:
                 torchvision.utils.save_image(
                     images,
                     fp=os.path.join(
-                        image_out_dir, f'output_epoch{epoch + 1}.jpg')
+                        image_out_dir,
+                        f'output_epoch{epoch + 1}.jpg'
+                    )
                 )
                 if not os.path.exists(config.model_path):
                     os.mkdir(config.model_path)
                 torch.save(
                     model.state_dict(),
-                    os.path.join(config.model_path,
-                                    f'SepNet_Epoch{epoch + 1}.pt')
+                    os.path.join(
+                        config.model_path,
+                        f'SepNet_Epoch{epoch + 1}.pt'
+                    )
                 )
-                return test_epoch_loss
 
             model.train()
             train_epoch_loss = run_epoch(is_train=True, loader=trn_loader)
@@ -91,9 +90,18 @@ class Trainer:
 
             model.eval()
             if (epoch + 1) % 100 == 0:
-                test_epoch_loss = save_progress()
+                with torch.no_grad():
+                    test_epoch_loss, constructed_images = run_epoch(
+                        is_train=False,
+                        loader=tst_loader,
+                        return_samples=True
+                    )
+                save_progress(constructed_images)
             else:
-                test_epoch_loss = run_epoch(is_train=False, loader=tst_loader)
+                with torch.no_grad():
+                    test_epoch_loss = run_epoch(
+                        is_train=False, loader=tst_loader
+                    )
             mean_test_epoch_loss = sum(test_epoch_loss) / len(test_epoch_loss)
             tqdm.write(
                 f'Epoch {epoch + 1}/{config.epochs}, \

@@ -10,7 +10,7 @@ class SeperationLoss:
 
     def __call__(self, constructed_images, image_pairs):
         batch_size = constructed_images.size(0)
-        pair_loss, separation_loss = None, None
+        pair_loss, part_loss = None, None
         for constructed_image, image_pair in zip(constructed_images, image_pairs):
             image0, image1 = image_pair
             rimage0, rimage1 = (constructed_image[:3, :, :],
@@ -18,39 +18,25 @@ class SeperationLoss:
             image0, image1 = image0.view(1, -1), image1.view(1, -1)
             rimage0, rimage1 = rimage0.view(1, -1), rimage1.view(1, -1)
             pair_loss0 = self._pair_loss(
-                image0.detach(),
-                image1.detach(),
-                rimage0.detach(),
-                rimage1.detach()
+                image0,
+                image1,
+                rimage0,
+                rimage1
             )
             pair_loss1 = self._pair_loss(
-                image0.detach(),
-                image1.detach(),
-                rimage1.detach(),
-                rimage0.detach()
+                image0,
+                image1,
+                rimage1,
+                rimage0
             )
-            if pair_loss0 < pair_loss1:
-                if pair_loss is None:
-                    pair_loss = self._pair_loss(
-                        image0, image1, rimage0, rimage1
-                    )
-                else:
-                    pair_loss += self._pair_loss(
-                        image0, image1, rimage0, rimage1
-                    )
+            if pair_loss is None:
+                pair_loss = min(pair_loss0, pair_loss1)
             else:
-                if pair_loss is None:
-                    pair_loss = self._pair_loss(
-                        image0, image1, rimage1, rimage0
-                    )
-                else:
-                    pair_loss += self._pair_loss(
-                        image0, image1, rimage1, rimage0
-                    )
-            if separation_loss is None:
-                separation_loss = self.loss(rimage0, rimage1)
+                pair_loss += min(pair_loss0, pair_loss1)
+            if part_loss is None:
+                part_loss = self.loss(rimage0, rimage1)
             else:
-                separation_loss += self.loss(rimage0, rimage1)
+                part_loss += self.loss(rimage0, rimage1)
         separation_loss = (self.alpha*pair_loss -
-                           (1-self.alpha)*separation_loss) / batch_size
+                           (1-self.alpha)*part_loss) / batch_size
         return separation_loss
