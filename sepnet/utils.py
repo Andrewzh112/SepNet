@@ -54,7 +54,8 @@ def ranom_uniform_pair(batch_size, low=0.3, high=0.7):
 def mix_images(images):
     batch_size = images.shape[0]
     pairs = pair_indices(batch_size)
-    ratios = list(ranom_uniform_pair(batch_size))
+    # ratios = list(ranom_uniform_pair(batch_size))
+    ratios = list([(0.5, 0.5) for _ in range(batch_size)])
     image_pairs, mixed_images = [], []
     for (i, j), ratio in zip(pairs, ratios):
         image0, image1 = images[i], images[j]

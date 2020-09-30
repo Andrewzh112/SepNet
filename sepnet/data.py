@@ -12,10 +12,15 @@ warnings.filterwarnings("ignore")
 
 
 class SepDataset(Dataset):
-    def __init__(self, statistics=None, transform=None, img_path='images', filter_imgs=False):
+    def __init__(self,
+                 statistics=None,
+                 transform=None,
+                 img_path='images',
+                 filter_imgs=False,
+                 image_size=224):
         super().__init__()
         if filter_imgs:
-            filter_images(image_path=img_path)
+            filter_images(min_dim=image_size, image_path=img_path)
         self.images = glob(os.path.join(img_path, '*'))
         shuffle(self.images)
         # M = [0.48572235511288586, 0.4533838840736244, 0.41519041094505277]
@@ -33,7 +38,7 @@ class SepDataset(Dataset):
             self.transform = transforms.Compose(
                 [
                     transforms.RandomHorizontalFlip(),
-                    transforms.RandomCrop((224, 224)),
+                    transforms.RandomCrop((image_size, image_size)),
                     transforms.ToTensor(),
                     transforms.Normalize(M, S)
                 ]
