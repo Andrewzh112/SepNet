@@ -3,6 +3,7 @@ import torchvision
 from torch.utils.data import DataLoader
 from sepnet.utils import mix_images, unstack_images
 from sepnet.loss import SeperationLoss
+import numpy as np
 from tqdm import tqdm
 import os
 
@@ -41,7 +42,9 @@ class Trainer:
 
             def run_epoch(is_train, loader, return_samples=False):
                 losses = []
-                for images in loader:
+                if return_samples:
+                    samplex_idx = np.random.choice(list(range(len(loader))))
+                for batch_idx, images in enumerate(loader):
                     if isinstance(images, tuple):
                         images = images[0]
                     images = images.to(device)
@@ -49,6 +52,9 @@ class Trainer:
                     constructed_images = model(mixed_images)
                     loss = criterion(constructed_images, image_pairs)
                     losses.append(loss.item())
+                    if return_samples and samplex_idx == batch_idx:
+                        # deep copy
+                        sample_images = torch.tensor(constructed_images)
                     if is_train:
                         loss.backward()
                         torch.nn.utils.clip_grad_norm_(
@@ -57,13 +63,13 @@ class Trainer:
                         optimizer.step()
                         scheduler.step()
                 if return_samples:
-                    return losses, constructed_images
+                    return losses, sample_images
                 return losses
 
             @torch.no_grad()
-            def save_progress(constructed_images):
+            def save_progress(sample_images):
                 images = unstack_images(
-                    constructed_images,
+                    sample_images,
                     self.trn_dataset.statistics
                 )
                 image_out_dir = 'img_outputs'
@@ -94,12 +100,12 @@ class Trainer:
             model.eval()
             if (epoch + 1) % progress_interval == 0:
                 with torch.no_grad():
-                    test_epoch_loss, constructed_images = run_epoch(
+                    test_epoch_loss, sample_images = run_epoch(
                         is_train=False,
                         loader=tst_loader,
                         return_samples=True
                     )
-                save_progress(constructed_images)
+                save_progress(sample_images)
             else:
                 with torch.no_grad():
                     test_epoch_loss = run_epoch(
