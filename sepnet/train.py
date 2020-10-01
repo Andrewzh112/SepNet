@@ -18,7 +18,7 @@ class Trainer:
                  config,
                  trn_dataset,
                  tst_dataset,
-                 loss_type='additon'):
+                 loss_type='addition'):
         self.config = config
         self.model = model
         self.trn_dataset = trn_dataset
@@ -28,7 +28,7 @@ class Trainer:
         )
         self.loss_type = loss_type
 
-    def train(self, progress_interval=100):
+    def train(self, progress_interval=100, sep_loss_anneal=None):
         config, device = self.config, self.device
         model = self.model.to(device)
         if self.loss_type == 'addition':
@@ -43,6 +43,7 @@ class Trainer:
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=20
         )
+
         trn_loader = DataLoader(self.trn_dataset, shuffle=True,
                                 pin_memory=True,
                                 batch_size=config.batch_size,
@@ -60,6 +61,7 @@ class Trainer:
             for batch_idx, images in enumerate(loader):
                 if isinstance(images, tuple):
                     images = images[0]
+                optimizer.zero_grad()
                 images = images.to(device)
                 image_pairs, mixed_images, _ = mix_images(images)
                 constructed_images = model(mixed_images)
@@ -131,3 +133,5 @@ class Trainer:
                     Train loss: {mean_train_epoch_loss:.3f}, \
                         Test loss: {mean_test_epoch_loss:.3f}'
             )
+            if sep_loss_anneal is not None and epoch > sep_loss_anneal:
+                criterion.alpha = max(criterion.alpha*0.999, 0.5)

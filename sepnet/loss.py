@@ -1,5 +1,5 @@
 class AdditionLoss:
-    def __init__(self, loss, alpha=0.99):
+    def __init__(self, loss, alpha=1.):
         self.loss = loss
         self.alpha = alpha
 
@@ -31,7 +31,7 @@ class AdditionLoss:
 
 
 class SeperationLoss:
-    def __init__(self, loss, alpha=0.8):
+    def __init__(self, loss, alpha=1.):
         self.loss = loss
         self.alpha = alpha
 

@@ -20,9 +20,8 @@ def convs(in_channels, out_channels):
 def down_irblock(in_channels, out_channels):
     return nn.Sequential(
         InvertedResidualBlock(in_channels, in_channels),
-        nn.ReLU6(inplace=True),
         nn.Conv2d(in_channels, out_channels, kernel_size=1),
-        nn.ReLU6(inplace=True)
+        nn.ReLU(inplace=True)
     )
 
 
@@ -319,4 +318,659 @@ class MobileUnet(nn.Module):
         x = self.upconv4(torch.cat([x, x1], dim=1))
         x = self.tconv5(x)
         x = self.sep(x)
+        return x
+
+
+class MobileUnet1DUp(nn.Module):
+    def __init__(self, in_channels, based_dim=32):
+        super().__init__()
+        self.conv1 = convs(in_channels, based_dim)
+        self.sconv1 = InvertedResidualBlock(based_dim,
+                                            based_dim,
+                                            stride=2)
+        self.conv2 = InvertedResidualBlock(based_dim, based_dim)
+        self.sconv2 = InvertedResidualBlock(based_dim,
+                                            based_dim*2,
+                                            stride=2,)
+        self.conv3 = InvertedResidualBlock(based_dim*2, based_dim*2)
+        self.sconv3 = InvertedResidualBlock(based_dim*2,
+                                            based_dim*4,
+                                            stride=2)
+        self.conv4 = InvertedResidualBlock(based_dim*4, based_dim*4)
+        self.sconv4 = InvertedResidualBlock(based_dim*4,
+                                            based_dim*8,
+                                            stride=2)
+        self.conv5 = InvertedResidualBlock(based_dim*8, based_dim*8)
+        self.sconv5 = InvertedResidualBlock(based_dim*8,
+                                            based_dim*16,
+                                            stride=2)
+
+        self.tconv1 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*16,
+                out_channels=based_dim*16,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*16,
+                out_channels=based_dim*8
+            )
+        )
+        self.upconv1 = down_irblock(based_dim*16, based_dim*8)
+        self.tconv2 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*8,
+                out_channels=based_dim*8,
+                kernel_size=2,
+                stride=2
+            ),
+            down_irblock(
+                in_channels=based_dim*8,
+                out_channels=based_dim*4
+            )
+        )
+        self.upconv2 = down_irblock(based_dim*8, based_dim*4)
+        self.tconv3 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*4,
+                out_channels=based_dim*4,
+                kernel_size=2,
+                stride=2
+            ),
+            down_irblock(
+                in_channels=based_dim*4,
+                out_channels=based_dim*2
+            )
+        )
+        self.upconv3 = down_irblock(based_dim*4, based_dim*2)
+        self.tconv4 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*2,
+                out_channels=based_dim*2,
+                kernel_size=2,
+                stride=2
+            ),
+            down_irblock(
+                in_channels=based_dim*2,
+                out_channels=based_dim
+            )
+        )
+        self.upconv4 = down_irblock(based_dim*2, based_dim)
+        self.tconv5 = nn.ConvTranspose2d(
+            in_channels=based_dim,
+            out_channels=based_dim,
+            kernel_size=2,
+            stride=2
+        )
+
+        self.sep = down_irblock(
+            in_channels=based_dim,
+            out_channels=in_channels*2
+        )
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+                nn.init.kaiming_normal_(
+                    m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, combined_image):
+        # encoder
+        # bs, c, h, w
+        x = self.conv1(combined_image)
+        x1 = self.sconv1(x)
+        x = self.conv2(x1)
+        x2 = self.sconv2(x)
+        x = self.conv3(x2)
+        x3 = self.sconv3(x)
+        x = self.conv4(x3)
+        x4 = self.sconv4(x)
+        x = self.conv5(x4)
+        x = self.sconv5(x)
+
+        # decoder
+        x = self.tconv1(x)
+        x = self.upconv1(torch.cat([x, x4], dim=1))
+        x = self.tconv2(x)
+        x = self.upconv2(torch.cat([x, x3], dim=1))
+        x = self.tconv3(x)
+        x = self.upconv3(torch.cat([x, x2], dim=1))
+        x = self.tconv4(x)
+        x = self.upconv4(torch.cat([x, x1], dim=1))
+        x = self.tconv5(x)
+        x = self.sep(x)
+        return x
+
+
+class MobileUnet2Heads(nn.Module):
+    def __init__(self, in_channels, based_dim=32):
+        super().__init__()
+        self.conv1 = convs(in_channels, based_dim)
+        self.sconv1 = InvertedResidualBlock(based_dim,
+                                            based_dim,
+                                            stride=2)
+        self.conv2 = InvertedResidualBlock(based_dim, based_dim)
+        self.sconv2 = InvertedResidualBlock(based_dim,
+                                            based_dim*2,
+                                            stride=2,)
+        self.conv3 = InvertedResidualBlock(based_dim*2, based_dim*2)
+        self.sconv3 = InvertedResidualBlock(based_dim*2,
+                                            based_dim*4,
+                                            stride=2)
+        self.conv4 = InvertedResidualBlock(based_dim*4, based_dim*4)
+        self.sconv4 = InvertedResidualBlock(based_dim*4,
+                                            based_dim*8,
+                                            stride=2)
+        self.conv5 = InvertedResidualBlock(based_dim*8, based_dim*8)
+        self.sconv5 = InvertedResidualBlock(based_dim*8,
+                                            based_dim*16,
+                                            stride=2)
+
+        self.tconv1h1 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*16,
+                out_channels=based_dim*16,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*16,
+                out_channels=based_dim*8
+            )
+        )
+        self.tconv1h2 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*16,
+                out_channels=based_dim*16,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*16,
+                out_channels=based_dim*8
+            )
+        )
+        self.upconv1h1 = down_irblock(based_dim*16, based_dim*8)
+        self.tconv2h1 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*8,
+                out_channels=based_dim*8,
+                kernel_size=2,
+                stride=2
+            ),
+            down_irblock(
+                in_channels=based_dim*8,
+                out_channels=based_dim*4
+            )
+        )
+        self.upconv1h2 = down_irblock(based_dim*16, based_dim*8)
+        self.tconv2h2 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*8,
+                out_channels=based_dim*8,
+                kernel_size=2,
+                stride=2
+            ),
+            down_irblock(
+                in_channels=based_dim*8,
+                out_channels=based_dim*4
+            )
+        )
+        self.upconv2h1 = down_irblock(based_dim*8, based_dim*4)
+        self.tconv3h1 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*4,
+                out_channels=based_dim*4,
+                kernel_size=2,
+                stride=2
+            ),
+            down_irblock(
+                in_channels=based_dim*4,
+                out_channels=based_dim*2
+            )
+        )
+        self.upconv2h2 = down_irblock(based_dim*8, based_dim*4)
+        self.tconv3h2 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*4,
+                out_channels=based_dim*4,
+                kernel_size=2,
+                stride=2
+            ),
+            down_irblock(
+                in_channels=based_dim*4,
+                out_channels=based_dim*2
+            )
+        )
+        self.upconv3h1 = down_irblock(based_dim*4, based_dim*2)
+        self.tconv4h1 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*2,
+                out_channels=based_dim*2,
+                kernel_size=2,
+                stride=2
+            ),
+            down_irblock(
+                in_channels=based_dim*2,
+                out_channels=based_dim
+            )
+        )
+        self.upconv3h2 = down_irblock(based_dim*4, based_dim*2)
+        self.tconv4h2 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*2,
+                out_channels=based_dim*2,
+                kernel_size=2,
+                stride=2
+            ),
+            down_irblock(
+                in_channels=based_dim*2,
+                out_channels=based_dim
+            )
+        )
+        self.upconv4h1 = down_irblock(based_dim*2, based_dim)
+        self.tconv5h1 = nn.ConvTranspose2d(
+            in_channels=based_dim,
+            out_channels=based_dim,
+            kernel_size=2,
+            stride=2
+        )
+        self.upconv4h2 = down_irblock(based_dim*2, based_dim)
+        self.tconv5h2 = nn.ConvTranspose2d(
+            in_channels=based_dim,
+            out_channels=based_dim,
+            kernel_size=2,
+            stride=2
+        )
+
+        self.seph1 = down_irblock(
+            in_channels=based_dim,
+            out_channels=in_channels
+        )
+        self.seph2 = down_irblock(
+            in_channels=based_dim,
+            out_channels=in_channels
+        )
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+                nn.init.kaiming_normal_(
+                    m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, combined_image):
+        # encoder
+        # bs, c, h, w
+        x = self.conv1(combined_image)
+        x1 = self.sconv1(x)
+        x = self.conv2(x1)
+        x2 = self.sconv2(x)
+        x = self.conv3(x2)
+        x3 = self.sconv3(x)
+        x = self.conv4(x3)
+        x4 = self.sconv4(x)
+        x = self.conv5(x4)
+        x = self.sconv5(x)
+
+        # decoder
+        xh1, xh2 = self.tconv1h1(x), self.tconv1h2(x)
+        xh1, xh2 = (self.upconv1h1(torch.cat([xh1, x4], dim=1)),
+                    self.upconv1h2(torch.cat([xh2, x4], dim=1)))
+        xh1, xh2 = self.tconv2h1(xh1), self.tconv2h2(xh2)
+        xh1, xh2 = (self.upconv2h1(torch.cat([xh1, x3], dim=1)),
+                    self.upconv2h2(torch.cat([xh2, x3], dim=1)))
+        xh1, xh2 = self.tconv3h1(xh1), self.tconv3h2(xh2)
+        xh1, xh2 = (self.upconv3h1(torch.cat([xh1, x2], dim=1)),
+                    self.upconv3h2(torch.cat([xh2, x2], dim=1)))
+        xh1, xh2 = self.tconv4h1(xh1), self.tconv4h2(xh2)
+        xh1, xh2 = (self.upconv4h1(torch.cat([xh1, x1], dim=1)),
+                    self.upconv4h2(torch.cat([xh2, x1], dim=1)))
+        xh1, xh2 = self.tconv5h1(xh1), self.tconv5h2(xh2)
+        xh1, xh2 = self.seph1(xh1), self.seph2(xh2)
+        x = torch.cat([xh1, xh2], dim=1)
+        return x
+
+
+class MobileUnetNoCat(nn.Module):
+    def __init__(self, in_channels, based_dim=32):
+        super().__init__()
+        self.conv1 = convs(in_channels, based_dim)
+        self.sconv1 = InvertedResidualBlock(based_dim,
+                                            based_dim,
+                                            stride=2)
+        self.conv2 = InvertedResidualBlock(based_dim, based_dim)
+        self.sconv2 = InvertedResidualBlock(based_dim,
+                                            based_dim*2,
+                                            stride=2,)
+        self.conv3 = InvertedResidualBlock(based_dim*2, based_dim*2)
+        self.sconv3 = InvertedResidualBlock(based_dim*2,
+                                            based_dim*4,
+                                            stride=2)
+        self.conv4 = InvertedResidualBlock(based_dim*4, based_dim*4)
+        self.sconv4 = InvertedResidualBlock(based_dim*4,
+                                            based_dim*8,
+                                            stride=2)
+        self.conv5 = InvertedResidualBlock(based_dim*8, based_dim*8)
+        self.sconv5 = InvertedResidualBlock(based_dim*8,
+                                            based_dim*16,
+                                            stride=2)
+        self.encoder = nn.Sequential(
+            self.conv1,
+            self.sconv1,
+            self.conv2,
+            self.sconv2,
+            self.conv3,
+            self.sconv3,
+            self.conv4,
+            self.sconv4,
+            self.conv5,
+            self.sconv5
+        )
+
+        self.tconv1 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*16,
+                out_channels=based_dim*16,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*16,
+                out_channels=based_dim*8
+            )
+        )
+        self.tconv2 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*8,
+                out_channels=based_dim*8,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*8,
+                out_channels=based_dim*4
+            )
+        )
+        self.tconv3 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*4,
+                out_channels=based_dim*4,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*4,
+                out_channels=based_dim*2
+            )
+        )
+        self.tconv4 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*2,
+                out_channels=based_dim*2,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*2,
+                out_channels=based_dim
+            )
+        )
+        self.tconv5 = nn.ConvTranspose2d(
+            in_channels=based_dim,
+            out_channels=based_dim,
+            kernel_size=2,
+            stride=2
+        )
+
+        self.sep = down_irblock(
+            in_channels=based_dim,
+            out_channels=in_channels*2
+        )
+        self.decoder = nn.Sequential(
+            self.tconv1,
+            self.tconv2,
+            self.tconv3,
+            self.tconv4,
+            self.tconv5,
+            nn.ReLU(),
+            self.sep
+        )
+
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+                nn.init.kaiming_normal_(
+                    m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, combined_image):
+        # encoder
+        # bs, c, h, w
+        x = self.encoder(combined_image)
+
+        # decoder
+        x = self.decoder(x)
+        return x
+
+
+class MobileUnetNoCat2Heads(nn.Module):
+    def __init__(self, in_channels, based_dim=32):
+        super().__init__()
+        self.conv1 = convs(in_channels, based_dim)
+        self.sconv1 = InvertedResidualBlock(based_dim,
+                                            based_dim,
+                                            stride=2)
+        self.conv2 = InvertedResidualBlock(based_dim, based_dim)
+        self.sconv2 = InvertedResidualBlock(based_dim,
+                                            based_dim*2,
+                                            stride=2,)
+        self.conv3 = InvertedResidualBlock(based_dim*2, based_dim*2)
+        self.sconv3 = InvertedResidualBlock(based_dim*2,
+                                            based_dim*4,
+                                            stride=2)
+        self.conv4 = InvertedResidualBlock(based_dim*4, based_dim*4)
+        self.sconv4 = InvertedResidualBlock(based_dim*4,
+                                            based_dim*8,
+                                            stride=2)
+        self.conv5 = InvertedResidualBlock(based_dim*8, based_dim*8)
+        self.sconv5 = InvertedResidualBlock(based_dim*8,
+                                            based_dim*16,
+                                            stride=2)
+        self.encoder = nn.Sequential(
+            self.conv1,
+            self.sconv1,
+            self.conv2,
+            self.sconv2,
+            self.conv3,
+            self.sconv3,
+            self.conv4,
+            self.sconv4,
+            self.conv5,
+            self.sconv5
+        )
+
+        self.tconv1h1 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*16,
+                out_channels=based_dim*16,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*16,
+                out_channels=based_dim*8
+            )
+        )
+        self.tconv1h2 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*16,
+                out_channels=based_dim*16,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*16,
+                out_channels=based_dim*8
+            )
+        )
+        self.tconv2h1 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*8,
+                out_channels=based_dim*8,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*8,
+                out_channels=based_dim*4
+            )
+        )
+        self.tconv2h2 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*8,
+                out_channels=based_dim*8,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*8,
+                out_channels=based_dim*4
+            )
+        )
+        self.tconv3h1 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*4,
+                out_channels=based_dim*4,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*4,
+                out_channels=based_dim*2
+            )
+        )
+        self.tconv3h2 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*4,
+                out_channels=based_dim*4,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*4,
+                out_channels=based_dim*2
+            )
+        )
+        self.tconv4h1 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*2,
+                out_channels=based_dim*2,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*2,
+                out_channels=based_dim
+            )
+        )
+        self.tconv4h2 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=based_dim*2,
+                out_channels=based_dim*2,
+                kernel_size=2,
+                stride=2
+            ),
+            nn.ReLU(),
+            down_irblock(
+                in_channels=based_dim*2,
+                out_channels=based_dim
+            )
+        )
+        self.tconv5h1 = nn.ConvTranspose2d(
+            in_channels=based_dim,
+            out_channels=based_dim,
+            kernel_size=2,
+            stride=2
+        )
+        self.tconv5h2 = nn.ConvTranspose2d(
+            in_channels=based_dim,
+            out_channels=based_dim,
+            kernel_size=2,
+            stride=2
+        )
+
+        self.seph1 = down_irblock(
+            in_channels=based_dim,
+            out_channels=in_channels
+        )
+        self.seph2 = down_irblock(
+            in_channels=based_dim,
+            out_channels=in_channels
+        )
+        self.decoderh1 = nn.Sequential(
+            self.tconv1h1,
+            self.tconv2h1,
+            self.tconv3h1,
+            self.tconv4h1,
+            self.tconv5h1,
+            nn.ReLU(),
+            self.seph1
+        )
+
+        self.decoderh2 = nn.Sequential(
+            self.tconv1h2,
+            self.tconv2h2,
+            self.tconv3h2,
+            self.tconv4h2,
+            self.tconv5h2,
+            nn.ReLU(),
+            self.seph2
+        )
+
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+                nn.init.kaiming_normal_(
+                    m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, combined_image):
+        # encoder
+        # bs, c, h, w
+        x = self.encoder(combined_image)
+
+        # decoder
+        xh1, xh2 = self.decoderh1(x), self.decoderh2(x)
+        x = torch.cat([xh1, xh2], dim=1)
         return x
