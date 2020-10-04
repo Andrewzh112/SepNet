@@ -27,6 +27,14 @@ def get_logger(name):
     return logger
 
 
+def crop_tensor(src, target):
+    target_size = target.size()[2]
+    srs_size = src.size()[2]
+    delta = srs_size - target_size
+    delta = delta // 2
+    return src[:, :, delta: srs_size-delta, delta: srs_size-delta]
+
+
 def filter_images(min_dim=224, image_path='images'):
     for image in glob(os.path.join(image_path, '*')):
         width, height = Image.open(image).size

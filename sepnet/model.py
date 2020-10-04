@@ -41,7 +41,7 @@ class ConvNormReLU(nn.Module):
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         if activation is None:
-            activation = nn.ReLU6()
+            activation = nn.LeakyReLU()
         padding = (kernel_size - 1) // 2
         self.conv = nn.Conv2d(
             in_channels,
@@ -96,14 +96,6 @@ class InvertedResidualBlock(nn.Module):
             return self.irblock(x)
         else:
             return self.irblock(x) + x
-
-
-def crop_tensor(src, target):
-    target_size = target.size()[2]
-    srs_size = src.size()[2]
-    delta = srs_size - target_size
-    delta = delta // 2
-    return src[:, :, delta: srs_size-delta, delta: srs_size-delta]
 
 
 class UNet_Based(nn.Module):
@@ -1020,4 +1012,198 @@ class MobileUnetNoCat2Heads(nn.Module):
         # decoder
         xh1, xh2 = self.decoderh1(x), self.decoderh2(x)
         x = torch.cat([xh1, xh2], dim=1)
+        return x
+
+
+class DeConvNormReLU(nn.Module):
+    def __init__(
+            self,
+            in_channels,
+            out_channels,
+            kernel_size=2,
+            stride=2,
+            groups=1,
+            activation=None,
+            norm_layer=None):
+        super().__init__()
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
+        if activation is None:
+            activation = nn.LeakyReLU()
+        self.conv = nn.ConvTranspose2d(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride,
+            groups=groups,
+            bias=False)
+        self.norm = norm_layer(out_channels)
+        self.activate = activation
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.norm(x)
+        return self.activate(x)
+
+
+class InvertedResidualTransBlock(nn.Module):
+    def __init__(
+            self,
+            in_channels,
+            out_channels,
+            stride=2,
+            t=6,
+            norm_layer=None):
+
+        super().__init__()
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
+        hidden_dim = int(in_channels * t)
+        modules = [ConvNormReLU(in_channels, hidden_dim,
+                                kernel_size=1, norm_layer=norm_layer)]
+        modules.append(DeConvNormReLU(hidden_dim,
+                                      hidden_dim,
+                                      stride=stride,
+                                      groups=hidden_dim,
+                                      norm_layer=norm_layer))
+        modules.append(
+            nn.Conv2d(hidden_dim,
+                      out_channels,
+                      kernel_size=1,
+                      bias=False))
+        modules.append(norm_layer(out_channels))
+        self.irtblock = nn.Sequential(*modules)
+
+    def forward(self, x):
+        return self.irtblock(x)
+
+
+class DistractionConv(nn.Module):
+    """Inspired by SKNet"""
+
+    def __init__(self, in_channels, M=3, r=16, stride=1, L=32, norm=None):
+        super().__init__()
+        d = max(in_channels//r, L)
+        if norm is None:
+            norm = nn.BatchNorm2d
+        self.in_channels, self.M = in_channels, M
+        self.covsA, self.covsB = nn.ModuleList([]), nn.ModuleList([])
+        for _ in range(M):
+            self.covsA.append(InvertedResidualBlock(
+                in_channels,
+                in_channels,
+                stride=stride,
+            ))
+            self.covsB.append(InvertedResidualBlock(
+                in_channels,
+                in_channels,
+                stride=stride,
+            ))
+
+        self.gapA = nn.AdaptiveAvgPool2d((1, 1))
+        self.gapB = nn.AdaptiveAvgPool2d((1, 1))
+        self.fcA = nn.Sequential(
+            nn.Conv2d(in_channels, d, kernel_size=1, stride=1, bias=False),
+            norm(d),
+            nn.LeakyReLU(inplace=True)
+        )
+        self.fcB = nn.Sequential(
+            nn.Conv2d(in_channels, d, kernel_size=1, stride=1, bias=False),
+            norm(d),
+            nn.LeakyReLU(inplace=True)
+        )
+        self.fcsA = nn.ModuleList(
+            [nn.Conv2d(
+                d, in_channels, kernel_size=1, stride=1
+            ) for _ in range(M)])
+        self.fcsB = nn.ModuleList(
+            [nn.Conv2d(
+                d, in_channels, kernel_size=1, stride=1
+            ) for _ in range(M)])
+        # self.softmin = nn.Softmin(dim=1)
+        self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, A, B):
+        batch_size = A.size(0)
+
+        featsA, featsB = ([deconv(A) for deconv in self.covsA],
+                          [deconv(B) for deconv in self.covsB])
+        featsA, featsB = torch.cat(featsA, dim=1), torch.cat(featsB, dim=1)
+        featsA, featsB = (featsA.view(
+            batch_size,
+            self.M,
+            self.in_channels,
+            featsA.shape[2],
+            featsA.shape[3]),
+            featsB.view(
+            batch_size,
+            self.M,
+            self.in_channels,
+            featsB.shape[2],
+            featsB.shape[3]))
+
+        featsA_U, featsB_U = torch.sum(featsA, dim=1), torch.sum(featsB, dim=1)
+        featsA_S, featsB_S = self.gapA(featsA_U), self.gapB(featsB_U)
+        featsA_Z, featsB_Z = self.fcA(featsA_S), self.fcB(featsB_S)
+
+        distractionA, distractionB = ([fc(featsA_Z) for fc in self.fcsA],
+                                      [fc(featsB_Z) for fc in self.fcsB])
+        distractionA, distractionB = (torch.cat(distractionA, dim=1),
+                                      torch.cat(distractionB, dim=1))
+        distractionA, distractionB = (distractionA.view(
+            batch_size,
+            self.M,
+            self.in_channels, 1, 1
+        ),
+            distractionB.view(
+            batch_size,
+            self.M,
+            self.in_channels, 1, 1)
+        )
+        distractionA, distractionB = (self.softmax(distractionA),
+                                      self.softmax(distractionB))
+
+        featsA_V, featsB_V = (torch.sum(featsA*distractionA, dim=1),
+                              torch.sum(featsB*distractionB, dim=1))
+        return featsA_V, featsB_V
+
+
+class MobileUnet2HeadsDistraction(MobileUnetNoCat2Heads):
+    def __init__(self, in_channels, based_dim=32):
+        super().__init__(in_channels, based_dim)
+        self.distract1 = DistractionConv(based_dim*8)
+        self.tconv1h1 = InvertedResidualTransBlock(based_dim*16, based_dim*8)
+        self.tconv1h2 = InvertedResidualTransBlock(based_dim*16, based_dim*8)
+        self.distract2 = DistractionConv(based_dim*4)
+        self.tconv2h1 = InvertedResidualTransBlock(based_dim*8, based_dim*4)
+        self.tconv2h2 = InvertedResidualTransBlock(based_dim*8, based_dim*4)
+        self.distract3 = DistractionConv(based_dim*2)
+        self.tconv3h1 = InvertedResidualTransBlock(based_dim*4, based_dim*2)
+        self.tconv3h2 = InvertedResidualTransBlock(based_dim*4, based_dim*2)
+        self.distract4 = DistractionConv(based_dim)
+        self.tconv4h1 = InvertedResidualTransBlock(based_dim*2, based_dim)
+        self.tconv4h2 = InvertedResidualTransBlock(based_dim*2, based_dim)
+        self.distract5 = DistractionConv(in_channels)
+        self.tconv5h1 = InvertedResidualTransBlock(based_dim, in_channels)
+        self.tconv5h2 = InvertedResidualTransBlock(based_dim, in_channels)
+
+        self._initialize_weights()
+
+    def forward(self, combined_image):
+        # bs, c, h, w
+        # encoder
+        A = B = self.encoder(combined_image)
+
+        # decoder
+        A, B = self.tconv1h1(A), self.tconv1h2(B)
+        A, B = self.distract1(A, B)
+        A, B = self.tconv2h1(A), self.tconv2h2(B)
+        A, B = self.distract2(A, B)
+        A, B = self.tconv3h1(A), self.tconv3h2(B)
+        A, B = self.distract3(A, B)
+        A, B = self.tconv4h1(A), self.tconv4h2(B)
+        A, B = self.distract4(A, B)
+        A, B = self.tconv5h1(A), self.tconv5h2(B)
+        A, B = self.distract5(A, B)
+        x = torch.cat((A, B), dim=1)
         return x
