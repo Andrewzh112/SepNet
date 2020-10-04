@@ -9,19 +9,20 @@ def convs(in_channels, out_channels):
                   kernel_size=3,
                   padding=1),
         nn.BatchNorm2d(out_channels),
-        nn.ReLU(inplace=True),
+        nn.LeakyReLU(inplace=True),
         nn.Conv2d(in_channels=out_channels,
                   out_channels=out_channels,
                   kernel_size=1),
-        nn.ReLU(inplace=True)
+        nn.LeakyReLU(inplace=True)
     )
 
 
 def down_irblock(in_channels, out_channels):
     return nn.Sequential(
         InvertedResidualBlock(in_channels, in_channels),
+        nn.LeakyReLU(inplace=True),
         nn.Conv2d(in_channels, out_channels, kernel_size=1),
-        nn.ReLU(inplace=True)
+        nn.LeakyReLU(inplace=True)
     )
 
 
@@ -175,7 +176,7 @@ class UNet_Based(nn.Module):
         for m in self.modules():
             if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
                 nn.init.kaiming_normal_(
-                    m.weight, mode='fan_out', nonlinearity='relu')
+                    m.weight, mode='fan_out', nonlinearity='leaky_relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -228,7 +229,7 @@ class MobileUnet(nn.Module):
         self.conv2 = InvertedResidualBlock(based_dim, based_dim)
         self.sconv2 = InvertedResidualBlock(based_dim,
                                             based_dim*2,
-                                            stride=2,)
+                                            stride=2)
         self.conv3 = InvertedResidualBlock(based_dim*2, based_dim*2)
         self.sconv3 = InvertedResidualBlock(based_dim*2,
                                             based_dim*4,
@@ -288,7 +289,7 @@ class MobileUnet(nn.Module):
         for m in self.modules():
             if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
                 nn.init.kaiming_normal_(
-                    m.weight, mode='fan_out', nonlinearity='relu')
+                    m.weight, mode='fan_out', nonlinearity='leaky_relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -352,7 +353,7 @@ class MobileUnet1DUp(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*16,
                 out_channels=based_dim*8
@@ -366,6 +367,7 @@ class MobileUnet1DUp(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*8,
                 out_channels=based_dim*4
@@ -379,6 +381,7 @@ class MobileUnet1DUp(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*4,
                 out_channels=based_dim*2
@@ -392,6 +395,7 @@ class MobileUnet1DUp(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*2,
                 out_channels=based_dim
@@ -415,7 +419,7 @@ class MobileUnet1DUp(nn.Module):
         for m in self.modules():
             if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
                 nn.init.kaiming_normal_(
-                    m.weight, mode='fan_out', nonlinearity='relu')
+                    m.weight, mode='fan_out', nonlinearity='leaky_relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -479,7 +483,7 @@ class MobileUnet2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*16,
                 out_channels=based_dim*8
@@ -492,7 +496,7 @@ class MobileUnet2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*16,
                 out_channels=based_dim*8
@@ -506,6 +510,7 @@ class MobileUnet2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*8,
                 out_channels=based_dim*4
@@ -519,6 +524,7 @@ class MobileUnet2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*8,
                 out_channels=based_dim*4
@@ -532,6 +538,7 @@ class MobileUnet2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*4,
                 out_channels=based_dim*2
@@ -545,6 +552,7 @@ class MobileUnet2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*4,
                 out_channels=based_dim*2
@@ -558,6 +566,7 @@ class MobileUnet2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*2,
                 out_channels=based_dim
@@ -571,6 +580,7 @@ class MobileUnet2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*2,
                 out_channels=based_dim
@@ -605,7 +615,7 @@ class MobileUnet2Heads(nn.Module):
         for m in self.modules():
             if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
                 nn.init.kaiming_normal_(
-                    m.weight, mode='fan_out', nonlinearity='relu')
+                    m.weight, mode='fan_out', nonlinearity='leaky_relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -637,6 +647,43 @@ class MobileUnet2Heads(nn.Module):
         xh1, xh2 = self.tconv4h1(xh1), self.tconv4h2(xh2)
         xh1, xh2 = (self.upconv4h1(torch.cat([xh1, x1], dim=1)),
                     self.upconv4h2(torch.cat([xh2, x1], dim=1)))
+        xh1, xh2 = self.tconv5h1(xh1), self.tconv5h2(xh2)
+        xh1, xh2 = self.seph1(xh1), self.seph2(xh2)
+        x = torch.cat([xh1, xh2], dim=1)
+        return x
+
+
+class MobileUnet2HeadsNoPrev(MobileUnet2Heads):
+    def __init__(self, in_channels, based_dim=32):
+        super().__init__(in_channels, based_dim)
+
+    def forward(self, combined_image):
+        # encoder
+        # bs, c, h, w
+        x = self.conv1(combined_image)
+        x = self.sconv1(x)
+        x = self.conv2(x)
+        x = self.sconv2(x)
+        x = self.conv3(x)
+        x = self.sconv3(x)
+        x = self.conv4(x)
+        x = self.sconv4(x)
+        x = self.conv5(x)
+        x = self.sconv5(x)
+
+        # decoder
+        xh1, xh2 = self.tconv1h1(x), self.tconv1h2(x)
+        xh1, xh2 = (self.upconv1h1(torch.cat([xh1, xh2], dim=1)),
+                    self.upconv1h2(torch.cat([xh2, xh1], dim=1)))
+        xh1, xh2 = self.tconv2h1(xh1), self.tconv2h2(xh2)
+        xh1, xh2 = (self.upconv2h1(torch.cat([xh1, xh2], dim=1)),
+                    self.upconv2h2(torch.cat([xh2, xh1], dim=1)))
+        xh1, xh2 = self.tconv3h1(xh1), self.tconv3h2(xh2)
+        xh1, xh2 = (self.upconv3h1(torch.cat([xh1, xh2], dim=1)),
+                    self.upconv3h2(torch.cat([xh2, xh1], dim=1)))
+        xh1, xh2 = self.tconv4h1(xh1), self.tconv4h2(xh2)
+        xh1, xh2 = (self.upconv4h1(torch.cat([xh1, xh2], dim=1)),
+                    self.upconv4h2(torch.cat([xh2, xh1], dim=1)))
         xh1, xh2 = self.tconv5h1(xh1), self.tconv5h2(xh2)
         xh1, xh2 = self.seph1(xh1), self.seph2(xh2)
         x = torch.cat([xh1, xh2], dim=1)
@@ -686,7 +733,7 @@ class MobileUnetNoCat(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*16,
                 out_channels=based_dim*8
@@ -699,7 +746,7 @@ class MobileUnetNoCat(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*8,
                 out_channels=based_dim*4
@@ -712,7 +759,7 @@ class MobileUnetNoCat(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*4,
                 out_channels=based_dim*2
@@ -725,7 +772,7 @@ class MobileUnetNoCat(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*2,
                 out_channels=based_dim
@@ -748,7 +795,7 @@ class MobileUnetNoCat(nn.Module):
             self.tconv3,
             self.tconv4,
             self.tconv5,
-            nn.ReLU(),
+            nn.LeakyReLU(),
             self.sep
         )
 
@@ -758,7 +805,7 @@ class MobileUnetNoCat(nn.Module):
         for m in self.modules():
             if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
                 nn.init.kaiming_normal_(
-                    m.weight, mode='fan_out', nonlinearity='relu')
+                    m.weight, mode='fan_out', nonlinearity='leaky_relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -816,7 +863,7 @@ class MobileUnetNoCat2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*16,
                 out_channels=based_dim*8
@@ -829,7 +876,7 @@ class MobileUnetNoCat2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*16,
                 out_channels=based_dim*8
@@ -842,7 +889,7 @@ class MobileUnetNoCat2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*8,
                 out_channels=based_dim*4
@@ -855,7 +902,7 @@ class MobileUnetNoCat2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*8,
                 out_channels=based_dim*4
@@ -868,7 +915,7 @@ class MobileUnetNoCat2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*4,
                 out_channels=based_dim*2
@@ -881,7 +928,7 @@ class MobileUnetNoCat2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*4,
                 out_channels=based_dim*2
@@ -894,7 +941,7 @@ class MobileUnetNoCat2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*2,
                 out_channels=based_dim
@@ -907,7 +954,7 @@ class MobileUnetNoCat2Heads(nn.Module):
                 kernel_size=2,
                 stride=2
             ),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             down_irblock(
                 in_channels=based_dim*2,
                 out_channels=based_dim
@@ -940,7 +987,7 @@ class MobileUnetNoCat2Heads(nn.Module):
             self.tconv3h1,
             self.tconv4h1,
             self.tconv5h1,
-            nn.ReLU(),
+            nn.LeakyReLU(),
             self.seph1
         )
 
@@ -950,7 +997,7 @@ class MobileUnetNoCat2Heads(nn.Module):
             self.tconv3h2,
             self.tconv4h2,
             self.tconv5h2,
-            nn.ReLU(),
+            nn.LeakyReLU(),
             self.seph2
         )
 
@@ -960,7 +1007,7 @@ class MobileUnetNoCat2Heads(nn.Module):
         for m in self.modules():
             if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
                 nn.init.kaiming_normal_(
-                    m.weight, mode='fan_out', nonlinearity='relu')
+                    m.weight, mode='fan_out', nonlinearity='leaky_relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)

@@ -12,20 +12,27 @@ class AdditionLoss:
                                 constructed_image[3:, :, :])
             image0, image1 = image0.view(1, -1), image1.view(1, -1)
             rimage0, rimage1 = rimage0.view(1, -1), rimage1.view(1, -1)
+            combined_img = 0.5*image0 + 0.5*image1
+
+            pt_loss = self.loss(
+                rimage0, combined_img
+            ) + self.loss(
+                rimage1, combined_img
+            )
+            ad_loss = self.loss(
+                combined_img,
+                0.5*rimage0 + 0.5*rimage1
+            )
+
             if addition_loss is None:
-                addition_loss = self.loss(
-                    0.5*image0 + 0.5*image1,
-                    0.5*rimage0 + 0.5*rimage1
-                )
+                addition_loss = ad_loss
             else:
-                addition_loss += self.loss(
-                    0.5*image0 + 0.5*image1,
-                    0.5*rimage0 + 0.5*rimage1
-                )
+                addition_loss += ad_loss
             if part_loss is None:
-                part_loss = self.loss(rimage0, rimage1)
+                part_loss = pt_loss
             else:
-                part_loss += self.loss(rimage0, rimage1)
+                part_loss += pt_loss
+
         return (self.alpha*addition_loss -
                 (1-self.alpha)*part_loss) / batch_size
 
@@ -61,14 +68,16 @@ class SeperationLoss:
                 rimage1,
                 rimage0
             )
+            pr_loss = min(pair_loss0, pair_loss1)
+            pt_loss = self.loss(rimage0, rimage1)
             if pair_loss is None:
-                pair_loss = min(pair_loss0, pair_loss1)
+                pair_loss = pr_loss
             else:
-                pair_loss += min(pair_loss0, pair_loss1)
+                pair_loss += pr_loss
             if part_loss is None:
-                part_loss = self.loss(rimage0, rimage1)
+                part_loss = pt_loss
             else:
-                part_loss += self.loss(rimage0, rimage1)
+                part_loss += pt_loss
         separation_loss = (self.alpha*pair_loss -
                            (1-self.alpha)*part_loss) / batch_size
         return separation_loss

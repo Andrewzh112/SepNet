@@ -1,11 +1,10 @@
 class Config:
     epochs = 1000
-    batch_size = 8
+    batch_size = 64
     opimizer_params = {
-        'lr': 3e-4,
-        'momentum': 0.5,
-        'weight_decay': 0.1,
-        'nesterov': True
+        'lr': 1e-3,
+        'betas': (0.5, 0.99),
+        'weight_decay': 0.01
     }
     grad_norm_clip = 1.0
     num_workers = 4

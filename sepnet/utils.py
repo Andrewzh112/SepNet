@@ -69,7 +69,7 @@ def mix_images(images):
     return image_pairs, mixed_images, ratios
 
 
-def unstack_images(constructed_images, statistics):
+def unstack_images(constructed_images, statistics, truths=False):
     M, S = statistics
     unnormalize = transforms.Compose(
         [
@@ -79,9 +79,13 @@ def unstack_images(constructed_images, statistics):
     )
     images = []
     for ci in constructed_images:
-        image0 = unnormalize(ci[:3, :, :])
-        image1 = unnormalize(ci[3:, :, :])
-        images.append(image0)
-        images.append(image1)
+        if not truths:
+            image0 = unnormalize(ci[:3, :, :])
+            image1 = unnormalize(ci[3:, :, :])
+            images.append(image0)
+            images.append(image1)
+        else:
+            img = unnormalize(ci)
+            images.append(img)
     images = torch.stack(images, dim=0)
     return images

@@ -28,20 +28,24 @@ class Trainer:
         )
         self.loss_type = loss_type
 
-    def train(self, progress_interval=100, sep_loss_anneal=None):
+    def train(self,
+              loss=torch.nn.MSELoss(),
+              progress_interval=100,
+              alpha=1.,
+              sep_loss_anneal=None):
         config, device = self.config, self.device
         model = self.model.to(device)
         if self.loss_type == 'addition':
-            criterion = AdditionLoss(loss=torch.nn.SmoothL1Loss())
+            criterion = AdditionLoss(loss=loss, alpha=alpha)
         elif self.loss_type == 'separation':
-            criterion = SeperationLoss(loss=torch.nn.SmoothL1Loss())
+            criterion = SeperationLoss(loss=loss, alpha=alpha)
         else:
             raise InvalidLossError
-        optimizer = torch.optim.SGD(
+        optimizer = torch.optim.Adam(
             model.parameters(), **config.opimizer_params
         )
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=20
+            optimizer, T_max=100
         )
 
         trn_loader = DataLoader(self.trn_dataset, shuffle=True,
@@ -70,6 +74,12 @@ class Trainer:
                 if return_samples and samplex_idx == batch_idx:
                     # deep copy
                     sample_images = torch.tensor(constructed_images)
+                    sample_truths = torch.cat(
+                        [torch.stack(
+                            [i0, i1],
+                            dim=0) for i0, i1 in image_pairs],
+                        dim=0
+                    )
                 if is_train:
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(
@@ -78,14 +88,19 @@ class Trainer:
                     optimizer.step()
                     scheduler.step()
             if return_samples:
-                return losses, sample_images
+                return losses, sample_images, sample_truths
             return losses
 
         @torch.no_grad()
-        def save_progress(sample_images):
+        def save_progress(sample_images, sample_truths):
             images = unstack_images(
                 sample_images,
                 self.trn_dataset.statistics
+            )
+            sample_truths = unstack_images(
+                sample_truths,
+                self.trn_dataset.statistics,
+                truths=True
             )
             image_out_dir = 'img_outputs'
             if not os.path.exists(image_out_dir):
@@ -95,6 +110,13 @@ class Trainer:
                 fp=os.path.join(
                     image_out_dir,
                     f'output_epoch{epoch + 1}.jpg'
+                )
+            )
+            torchvision.utils.save_image(
+                sample_truths,
+                fp=os.path.join(
+                    image_out_dir,
+                    f'truths_epoch{epoch + 1}.jpg'
                 )
             )
             if not os.path.exists(config.model_path):
@@ -116,12 +138,12 @@ class Trainer:
             model.eval()
             if (epoch + 1) % progress_interval == 0:
                 with torch.no_grad():
-                    test_epoch_loss, sample_images = run_epoch(
+                    test_epoch_loss, sample_images, sample_truths = run_epoch(
                         is_train=False,
                         loader=tst_loader,
                         return_samples=True
                     )
-                save_progress(sample_images)
+                save_progress(sample_images, sample_truths)
             else:
                 with torch.no_grad():
                     test_epoch_loss = run_epoch(
