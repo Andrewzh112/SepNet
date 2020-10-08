@@ -5,7 +5,7 @@ class AdditionLoss:
 
     def __call__(self, constructed_images, image_pairs):
         batch_size = constructed_images.size(0)
-        addition_loss, part_loss = None, None
+        addition_loss, part_loss = 0, 0
         for constructed_image, image_pair in zip(constructed_images, image_pairs):
             image0, image1 = image_pair
             rimage0, rimage1 = (constructed_image[:3, :, :],
@@ -24,14 +24,8 @@ class AdditionLoss:
                 0.5*rimage0 + 0.5*rimage1
             )
 
-            if addition_loss is None:
-                addition_loss = ad_loss
-            else:
-                addition_loss += ad_loss
-            if part_loss is None:
-                part_loss = pt_loss
-            else:
-                part_loss += pt_loss
+            addition_loss += ad_loss
+            part_loss += pt_loss
 
         return (self.alpha*addition_loss -
                 (1-self.alpha)*part_loss) / batch_size
@@ -68,16 +62,10 @@ class SeperationLoss:
                 rimage1,
                 rimage0
             )
-            pr_loss = min(pair_loss0, pair_loss1)
-            pt_loss = self.loss(rimage0, rimage1)
-            if pair_loss is None:
-                pair_loss = pr_loss
+            if pair_loss0 < pair_loss1:
+                pair_loss += max(self.loss(image0, rimage0) + self.loss(image1, rimage1))
             else:
-                pair_loss += pr_loss
-            if part_loss is None:
-                part_loss = pt_loss
-            else:
-                part_loss += pt_loss
-        separation_loss = (self.alpha*pair_loss -
-                           (1-self.alpha)*part_loss) / batch_size
-        return separation_loss
+                pair_loss += max(self.loss(image0, rimage1) + self.loss(image1, rimage0))
+            part_loss += self.loss(rimage0, rimage1)
+        return (self.alpha*pair_loss -
+                (1-self.alpha)*part_loss) / batch_size
